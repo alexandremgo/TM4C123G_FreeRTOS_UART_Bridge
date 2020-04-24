@@ -10,7 +10,7 @@ Tiva TM4C123G LaunchPad UART peripherals: UART0 connected to the USB connector a
 The baud rate is 115200 bps.
 
 <p align="center">
-  <img src="Doc/Img/PuTTY_serial_RPi.png" width="200" title="RPi serial connected using PuTTY" alt="RPi serial connected using PuTTY">
+  <img src="Doc/Img/PuTTY_serial_RPi.png" width="450" title="RPi serial connected using PuTTY" alt="RPi serial connected using PuTTY">
 </p>
 
 Check [https://pinout.xyz](https://pinout.xyz/pinout/uart#) to get the pins right on your RPi.
@@ -19,7 +19,7 @@ pin for the UART3. The receiver PC6 should be connected to the RPi transmitter (
 the transmitter PC7 should be connected to the RPi receiver (pin 10).
 
 <p align="center">
-  <img src="Doc/Img/RPi_Tiva.jpg" width="200" title="RPi connected to the Tiva TM4C123G LaunchPad" alt="RPi connected to the Tiva TM4C123G LaunchPad">
+  <img src="Doc/Img/RPi_Tiva.jpg" width="450" title="RPi connected to the Tiva TM4C123G LaunchPad" alt="RPi connected to the Tiva TM4C123G LaunchPad">
 </p>
 
 This project uses [FreeRTOS](https://www.freertos.org/). 
