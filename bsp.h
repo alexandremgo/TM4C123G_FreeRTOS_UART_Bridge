@@ -9,8 +9,17 @@
 #include "task.h"
 #include "semphr.h"
 
+/* Data structure representing a data transfer request
+ * from one UART to another. */
+typedef struct {
+    UART0_Type* from;
+    UART0_Type* to;
+} TransferRequest;
+
 /* On-board led. */
 #define LED_GREEN (1U << 3)
+
+#define CHAR_NULL 0
 
 /* Initialize the needed hardware and interrupts. */
 void BSP_init( void );
@@ -31,14 +40,19 @@ void BSP_configUART(UART0_Type* uart);
 /* Init the used leds. */
 void BSP_initLeds(void);
 
+/* Send a char through an UART connection. */
 void BSP_sendChar(UART0_Type* uart, unsigned char one_byte);
 
-char BSP_readChar(UART0_Type* uart);
+/* Read a char coming from UART connection. */
+unsigned char BSP_readChar(UART0_Type* uart);
 
-void BSP_readStr(UART0_Type* uart, unsigned char *buffer);
-
+/* Send a string through an UART connection. */
 void BSP_sendStr(UART0_Type* uart, unsigned char *buffer);
 
+/* Read a string coming from UART connection. */
+void BSP_readStr(UART0_Type* uart, unsigned char *buffer);
+
+/* Transfer a char from one UART connection to another. */
 void BSP_transferData(UART0_Type* from, UART0_Type* to);
 
 void BSP_ledGreenToggle(void);

@@ -1,9 +1,13 @@
 /* Board Support Package (BSP) for the EK-TM4C123GXL board */
 #include "bsp.h"
 
-extern SemaphoreHandle_t uart0_binary_sema;
-extern SemaphoreHandle_t uart3_binary_sema;
-extern SemaphoreHandle_t transceiver_mutex;
+extern QueueHandle_t uart_transfer_queue;
+
+#define TRANSFER_R_FROM_UART0 0
+#define TRANSFER_R_FROM_UART3 1
+static const TransferRequest transfer_requests[2] = { { UART0, UART3 }, /* Used by UART0_IRQHandler. */
+                                                      { UART3, UART0 }  /* Used by UART3_IRQHandler. */
+};
 
 void BSP_init(void)
 {
@@ -137,14 +141,25 @@ void BSP_configUART(UART0_Type* uart) {
 
 void UART0_IRQHandler(void) {
 
+    /* Debug: to monitor the needed size for the uart_transfer_queue. */
+    static unsigned nb_UART0errQueueFull = 0;
+
     /* If context switch is required, if will get set to pdTRUE
-     * inside the interrupt safe API function. */
+     * inside xQueueSendToBackFromISR. */
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     /* Raw Interrupt Status: check interrupt caused by receiving status. */
     if ((UART0->RIS & (1u << 4)) != 0u)
     {
-        xSemaphoreGiveFromISR(uart0_binary_sema, &xHigherPriorityTaskWoken);
+        BaseType_t status;
+
+        status = xQueueSendToBackFromISR(uart_transfer_queue,
+                                &transfer_requests[TRANSFER_R_FROM_UART0],
+                                &xHigherPriorityTaskWoken);
+
+        if(status == errQUEUE_FULL) {
+            nb_UART0errQueueFull++;
+        }
     }
 
     /* Clear interrupt sources. */
@@ -155,14 +170,25 @@ void UART0_IRQHandler(void) {
 
 void UART3_IRQHandler(void) {
 
+    /* Debug: to monitor the needed size for the uart_transfer_queue. */
+    static unsigned nb_UART3errQueueFull = 0;
+
     /* If context switch is required, if will get set to pdTRUE
-     * inside the interrupt safe API function. */
+     * inside xQueueSendToBackFromISR. */
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     /* Raw Interrupt Status: check interrupt caused by receiving status. */
     if ((UART3->RIS & (1u << 4)) != 0u)
     {
-        xSemaphoreGiveFromISR(uart3_binary_sema, &xHigherPriorityTaskWoken);
+        BaseType_t status;
+
+        status = xQueueSendToBackFromISR(uart_transfer_queue,
+                                &transfer_requests[TRANSFER_R_FROM_UART3],
+                                &xHigherPriorityTaskWoken);
+
+        if(status == errQUEUE_FULL) {
+            nb_UART3errQueueFull++;
+        }
     }
 
     /* Clear interrupt sources. */
@@ -180,11 +206,15 @@ void BSP_sendChar(UART0_Type* uart, unsigned char c)
     uart->DR = c;
 }
 
-char BSP_readChar(UART0_Type* uart)
+unsigned char BSP_readChar(UART0_Type* uart)
 {
-    char c;
-    /* Wait that the data register is not empty. */
-    while ((uart->FR & (1u << 4)) != 0);
+    unsigned char c;
+
+    /* Check that the data register is not empty. */
+    if((uart->FR & (1u << 4)) != 0) {
+        return CHAR_NULL;
+    }
+
     c = uart->DR;
     return c;
 }
@@ -211,18 +241,17 @@ void BSP_sendStr(UART0_Type* uart, unsigned char *buffer)
     }
 }
 
-void BSP_transferData(UART0_Type* from, UART0_Type* to) {
+void BSP_transferData(UART0_Type* from, UART0_Type* to)
+{
+    BSP_ledGreenToggle();
 
-    /* Attempt to take the mutex, blocking indefinitely to wait for the mutex if it is
-     * not available straight away.
-     * TODO: in production, no infinite time and check error. */
-    xSemaphoreTake(transceiver_mutex, portMAX_DELAY);
-    {
-        BSP_ledGreenToggle();
+//    while ((from->FR & (1u << 4)) == 0)
+//    {
         char c = BSP_readChar(from);
-        BSP_sendChar(to, c);
-    }
-    xSemaphoreGive(transceiver_mutex);
+        if(c != CHAR_NULL) {
+            BSP_sendChar(to, c);
+        }
+//    }
 }
 
 

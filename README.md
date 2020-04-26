@@ -4,6 +4,7 @@
 
 If like me you have a Raspberry Pi and a development board with a USB connector
 but no USB-to-serial cable, and you want to connect your RPi through its serial ports, this code can be useful.  
+This project was also an excuse to play with FreeRTOS.  
 
 It transfers the data from the RPi to the computer (and in the other direction) through the 
 Tiva TM4C123G LaunchPad UART peripherals: UART0 connected to the USB connector and UART3 connected to the RPi.

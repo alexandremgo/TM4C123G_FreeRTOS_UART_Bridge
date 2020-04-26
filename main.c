@@ -1,3 +1,7 @@
+/*
+ * Transfer data from UART0 to UART3 and UART3 to UART0 on a Tiva TM4C123G.
+ */
+
 /* Kernel includes. */
 #include "FreeRTOS.h"
 #include "task.h"
@@ -8,51 +12,43 @@
 #include "bsp.h"
 
 /* Definition of the functions implementing the tasks. */
-static void vUART0Task(void* pvParameters);
-static void vUART3Task(void* pvParameters);
+static void vUARTGatekeeperTask(void* pvParameters);
 
-SemaphoreHandle_t uart0_binary_sema = NULL;
-SemaphoreHandle_t uart3_binary_sema = NULL;
-
-SemaphoreHandle_t transceiver_mutex = NULL;
+/* Handle of the queue that stores the data transfer requests
+ * that should be done by the UART gatekeeper task. */
+QueueHandle_t uart_transfer_queue;
 
 /*-----------------------------------------------------------*/
 
-static void vUART0Task(void* pvParameters)
+/* A gatekeeper task is a cleaner method of implementing mutual exclusion.
+ * Only the gatekeeper task is allowed to directly access the resource.
+ * Other tasks and interrupts can access the resource through the
+ * gatekeeper's queue.
+ */
+static void vUARTGatekeeperTask(void *pvParameters)
 {
+    TransferRequest request;
+
     for (;;)
     {
-        xSemaphoreTake(uart0_binary_sema, portMAX_DELAY);
-        BSP_transferData(UART0, UART3);
-    }
-}
-
-static void vUART3Task(void* pvParameters)
-{
-    for(;;) {
-        xSemaphoreTake(uart3_binary_sema, portMAX_DELAY);
-        BSP_transferData(UART3, UART0);
+        /* Wait for a message to arrive. */
+        xQueueReceive(uart_transfer_queue, &request, portMAX_DELAY);
+        BSP_transferData(request.from, request.to);
     }
 }
 
 int main()
 {
-    /* Create binary semaphores for UART0 and UART3 tasks. */
-    uart0_binary_sema = xSemaphoreCreateBinary();
-    uart3_binary_sema = xSemaphoreCreateBinary();
-
-    /* Create Mutex for the transfer data function.
-     * With a mutex, the low priority tasks are promoting to the
-     * priority of the highest task using this mutex. */
-    transceiver_mutex = xSemaphoreCreateMutex();
+    /* The queue is created to hold a maximum of 3 TransferRequest.
+     * Normally, with a baud rate of 115200 and a system clock of 50Mhz,
+     * only a size 2 should be needed. */
+    uart_transfer_queue = xQueueCreate(3, sizeof(TransferRequest));
 
     BSP_init();
 
-    if (uart0_binary_sema != NULL && uart3_binary_sema != NULL &&  transceiver_mutex != NULL)
+    if (uart_transfer_queue != NULL)
     {
-        xTaskCreate(vUART0Task, "UART0", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
-
-        xTaskCreate(vUART3Task, "UART3", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+        xTaskCreate(vUARTGatekeeperTask, "UART_Gatekeeper", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
 
         BSP_sendStr(UART0, (unsigned char*) "\n*****UART TRANSCEIVER*****\n");
         BSP_sendStr(UART0, (unsigned char*) "* pin (Tiva) PC6 (RX) should be connected to pin (RPi) 8 (TX)\n");
